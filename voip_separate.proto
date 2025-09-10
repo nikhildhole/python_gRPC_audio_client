@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package voip;
 
+// Audio streaming service
 service AudioService {
     rpc StreamAudio(stream AudioChunk) returns (stream AudioChunk);
 }
 
+// Event streaming service
 service EventService {
     rpc StreamEvents(stream Event) returns (stream Event);
 }
@@ -17,6 +19,6 @@ message AudioChunk {
 }
 
 message Event {
-    string type = 1;   // e.g., END_CALL, ABC_EVENT
+    string type = 1;
     string data = 2;
 }

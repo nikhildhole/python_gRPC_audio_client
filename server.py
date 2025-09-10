@@ -2,42 +2,49 @@ import grpc
 from concurrent import futures
 import threading
 import queue
-import sounddevice as sd
-import numpy as np
+import time
 import voip_separate_pb2
 import voip_separate_pb2_grpc
-import time
 
-event_queue = queue.Queue()  # Queue for sending events from CLI
+server_event_queue = queue.Queue()  # For CLI events
 
 class AudioService(voip_separate_pb2_grpc.AudioServiceServicer):
     def StreamAudio(self, request_iterator, context):
+        """Echo back audio to the same client"""
         for chunk in request_iterator:
-            yield voip_separate_pb2.AudioChunk(
-                data=chunk.data,
-                sample_rate=chunk.sample_rate,
-                channels=chunk.channels
-            )
+            yield chunk  # simply echo back
 
 class EventService(voip_separate_pb2_grpc.EventServiceServicer):
     def StreamEvents(self, request_iterator, context):
-        def send_cli_events():
+        client_queue = queue.Queue()
+
+        def send_server_events():
             while True:
-                evt = event_queue.get()
-                yield evt
+                evt = server_event_queue.get()
+                client_queue.put(evt)
 
-        # Start sending CLI events in another thread
-        threading.Thread(target=send_cli_events, daemon=True).start()
+        threading.Thread(target=send_server_events, daemon=True).start()
 
-        for event in request_iterator:
-            print(f"[CLIENT EVENT RECEIVED] {event.type}: {event.data}")
-            # Echo back the same event
-            yield voip_separate_pb2.Event(type=event.type, data=event.data)
+        # Thread to read client events
+        def read_client_events():
+            try:
+                for evt in request_iterator:
+                    print(f"[CLIENT EVENT] {evt.type}: {evt.data}")
+            except grpc.RpcError:
+                pass
+
+        threading.Thread(target=read_client_events, daemon=True).start()
+
+        # Yield server events to the client
+        while True:
+            evt = client_queue.get()
+            yield evt
 
 def cli_input_thread():
     while True:
         cmd = input("SERVER CLI EVENT> ")
-        event_queue.put(voip_separate_pb2.Event(type=cmd, data="From server CLI"))
+        evt = voip_separate_pb2.Event(type=cmd, data="From server CLI")
+        server_event_queue.put(evt)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -46,7 +53,9 @@ def serve():
     server.add_insecure_port('[::]:50051')
     server.start()
     print("Server running on port 50051")
+
     threading.Thread(target=cli_input_thread, daemon=True).start()
+
     try:
         while True:
             time.sleep(86400)

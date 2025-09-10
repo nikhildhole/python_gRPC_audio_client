@@ -26,7 +26,8 @@ if _version_not_supported:
 
 
 class AudioServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """Audio streaming service
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -42,7 +43,8 @@ class AudioServiceStub(object):
 
 
 class AudioServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """Audio streaming service
+    """
 
     def StreamAudio(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
@@ -67,7 +69,8 @@ def add_AudioServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class AudioService(object):
-    """Missing associated documentation comment in .proto file."""
+    """Audio streaming service
+    """
 
     @staticmethod
     def StreamAudio(request_iterator,
@@ -98,7 +101,8 @@ class AudioService(object):
 
 
 class EventServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """Event streaming service
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -114,7 +118,8 @@ class EventServiceStub(object):
 
 
 class EventServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """Event streaming service
+    """
 
     def StreamEvents(self, request_iterator, context):
         """Missing associated documentation comment in .proto file."""
@@ -139,7 +144,8 @@ def add_EventServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class EventService(object):
-    """Missing associated documentation comment in .proto file."""
+    """Event streaming service
+    """
 
     @staticmethod
     def StreamEvents(request_iterator,

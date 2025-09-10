@@ -6,7 +6,6 @@ import numpy as np
 import voip_separate_pb2
 import voip_separate_pb2_grpc
 
-# Audio config
 RATE = 16000
 CHANNELS = 1
 CHUNK = 1024
@@ -24,12 +23,19 @@ def audio_stream(stub):
     def gen_audio():
         while True:
             chunk = audio_queue.get()
-            yield voip_separate_pb2.AudioChunk(data=chunk.tobytes(), sample_rate=RATE, channels=CHANNELS)
+            yield voip_separate_pb2.AudioChunk(
+                data=chunk.tobytes(),
+                sample_rate=RATE,
+                channels=CHANNELS
+            )
 
-    responses = stub.StreamAudio(gen_audio())
-    with sd.OutputStream(samplerate=RATE, channels=CHANNELS, blocksize=CHUNK, dtype='int16') as speaker:
-        for chunk in responses:
-            speaker.write(np.frombuffer(chunk.data, dtype='int16').reshape(-1, CHANNELS))
+    try:
+        responses = stub.StreamAudio(gen_audio())
+        with sd.OutputStream(samplerate=RATE, channels=CHANNELS, blocksize=CHUNK, dtype='int16') as speaker:
+            for chunk in responses:
+                speaker.write(np.frombuffer(chunk.data, dtype='int16').reshape(-1, CHANNELS))
+    except grpc.RpcError as e:
+        print("Audio stream disconnected:", e)
 
 def event_stream(stub):
     def gen_events():
@@ -37,14 +43,12 @@ def event_stream(stub):
             evt = event_queue.get()
             yield evt
 
-    responses = stub.StreamEvents(gen_events())
-    for event in responses:
-        print(f"[SERVER EVENT] {event.type}: {event.data}")
-
-def cli_input_thread():
-    while True:
-        cmd = input("CLIENT CLI EVENT> ")
-        event_queue.put(voip_separate_pb2.Event(type=cmd, data="From client CLI"))
+    try:
+        responses = stub.StreamEvents(gen_events())
+        for evt in responses:
+            print(f"[SERVER EVENT] {evt.type}: {evt.data}")
+    except grpc.RpcError as e:
+        print("Event stream disconnected:", e)
 
 def main():
     channel = grpc.insecure_channel('localhost:50051')
@@ -54,11 +58,15 @@ def main():
     threading.Thread(target=record_audio, daemon=True).start()
     threading.Thread(target=audio_stream, args=(audio_stub,), daemon=True).start()
     threading.Thread(target=event_stream, args=(event_stub,), daemon=True).start()
-    threading.Thread(target=cli_input_thread, daemon=True).start()
 
-    # Keep main thread alive
-    while True:
-        pass
+    try:
+        while True:
+            cmd = input("CLIENT CLI EVENT> ")
+            event_queue.put(voip_separate_pb2.Event(type=cmd, data="From client CLI"))
+    except EOFError:
+        print("Input closed, exiting...")
+    except KeyboardInterrupt:
+        print("Exiting client...")
 
 if __name__ == "__main__":
     main()
