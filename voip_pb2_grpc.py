@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import chat_pb2 as chat__pb2
+import voip_pb2 as voip__pb2
 
 GRPC_GENERATED_VERSION = '1.74.0'
 GRPC_VERSION = grpc.__version__
@@ -18,15 +18,16 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in chat_pb2_grpc.py depends on'
+        + f' but the generated code in voip_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
 
 
-class ChatServiceStub(object):
-    """Missing associated documentation comment in .proto file."""
+class VoIPServiceStub(object):
+    """Bidirectional audio + event streaming service
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -34,44 +35,45 @@ class ChatServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.ChatStream = channel.stream_stream(
-                '/chat.ChatService/ChatStream',
-                request_serializer=chat__pb2.ChatMessage.SerializeToString,
-                response_deserializer=chat__pb2.ChatMessage.FromString,
+        self.Stream = channel.stream_stream(
+                '/voip.VoIPService/Stream',
+                request_serializer=voip__pb2.VoIPMessage.SerializeToString,
+                response_deserializer=voip__pb2.VoIPMessage.FromString,
                 _registered_method=True)
 
 
-class ChatServiceServicer(object):
-    """Missing associated documentation comment in .proto file."""
+class VoIPServiceServicer(object):
+    """Bidirectional audio + event streaming service
+    """
 
-    def ChatStream(self, request_iterator, context):
-        """Bidirectional streaming RPC
-        """
+    def Stream(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_ChatServiceServicer_to_server(servicer, server):
+def add_VoIPServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ChatStream': grpc.stream_stream_rpc_method_handler(
-                    servicer.ChatStream,
-                    request_deserializer=chat__pb2.ChatMessage.FromString,
-                    response_serializer=chat__pb2.ChatMessage.SerializeToString,
+            'Stream': grpc.stream_stream_rpc_method_handler(
+                    servicer.Stream,
+                    request_deserializer=voip__pb2.VoIPMessage.FromString,
+                    response_serializer=voip__pb2.VoIPMessage.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'chat.ChatService', rpc_method_handlers)
+            'voip.VoIPService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('chat.ChatService', rpc_method_handlers)
+    server.add_registered_method_handlers('voip.VoIPService', rpc_method_handlers)
 
 
  # This class is part of an EXPERIMENTAL API.
-class ChatService(object):
-    """Missing associated documentation comment in .proto file."""
+class VoIPService(object):
+    """Bidirectional audio + event streaming service
+    """
 
     @staticmethod
-    def ChatStream(request_iterator,
+    def Stream(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -84,9 +86,9 @@ class ChatService(object):
         return grpc.experimental.stream_stream(
             request_iterator,
             target,
-            '/chat.ChatService/ChatStream',
-            chat__pb2.ChatMessage.SerializeToString,
-            chat__pb2.ChatMessage.FromString,
+            '/voip.VoIPService/Stream',
+            voip__pb2.VoIPMessage.SerializeToString,
+            voip__pb2.VoIPMessage.FromString,
             options,
             channel_credentials,
             insecure,

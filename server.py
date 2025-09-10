@@ -1,21 +1,28 @@
 import grpc
 from concurrent import futures
-import chat_pb2
-import chat_pb2_grpc
+import voip_pb2
+import voip_pb2_grpc
 import time
 
-class ChatService(chat_pb2_grpc.ChatServiceServicer):
-    def ChatStream(self, request_iterator, context):
-        for chat_message in request_iterator:
-            print(f"Received from {chat_message.user}: {chat_message.message}")
-            yield chat_pb2.ChatMessage(user="Server", message=f"Echo: {chat_message.message}")
+class VoIPService(voip_pb2_grpc.VoIPServiceServicer):
+    def Stream(self, request_iterator, context):
+        for message in request_iterator:
+            if message.HasField("audio"):
+                # Echo back audio
+                audio_chunk = message.audio
+                yield voip_pb2.VoIPMessage(audio=audio_chunk)
+            elif message.HasField("event"):
+                event = message.event
+                print(f"Received event: {event.type}, data: {event.data}")
+                # Example: echo back the event
+                yield voip_pb2.VoIPMessage(event=event)
 
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatService(), server)
+    voip_pb2_grpc.add_VoIPServiceServicer_to_server(VoIPService(), server)
     server.add_insecure_port('[::]:50051')
     server.start()
-    print("Server started on port 50051")
+    print("VoIP Server running on port 50051")
     try:
         while True:
             time.sleep(86400)
