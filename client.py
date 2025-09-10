@@ -1,58 +1,64 @@
 import grpc
-import voip_pb2
-import voip_pb2_grpc
 import threading
-import pyaudio
+import queue
+import sounddevice as sd
+import numpy as np
+import voip_separate_pb2
+import voip_separate_pb2_grpc
 
 # Audio config
 RATE = 16000
-CHUNK = 1024
 CHANNELS = 1
+CHUNK = 1024
 
-def stream_audio(stub):
-    audio = pyaudio.PyAudio()
-    # Input stream (mic)
-    stream_in = audio.open(format=pyaudio.paInt16,
-                           channels=CHANNELS,
-                           rate=RATE,
-                           input=True,
-                           frames_per_buffer=CHUNK)
-    # Output stream (speaker)
-    stream_out = audio.open(format=pyaudio.paInt16,
-                            channels=CHANNELS,
-                            rate=RATE,
-                            output=True,
-                            frames_per_buffer=CHUNK)
+audio_queue = queue.Queue()
+event_queue = queue.Queue()
 
-    def request_generator():
+def record_audio():
+    with sd.InputStream(samplerate=RATE, channels=CHANNELS, blocksize=CHUNK, dtype='int16') as mic:
         while True:
-            data = stream_in.read(CHUNK, exception_on_overflow=False)
-            yield voip_pb2.VoIPMessage(audio=voip_pb2.AudioChunk(data=data, sample_rate=RATE, channels=CHANNELS))
+            data, _ = mic.read(CHUNK)
+            audio_queue.put(data)
 
-    responses = stub.Stream(request_generator())
+def audio_stream(stub):
+    def gen_audio():
+        while True:
+            chunk = audio_queue.get()
+            yield voip_separate_pb2.AudioChunk(data=chunk.tobytes(), sample_rate=RATE, channels=CHANNELS)
 
-    for response in responses:
-        if response.HasField("audio"):
-            stream_out.write(response.audio.data)
-        elif response.HasField("event"):
-            print(f"Received event: {response.event.type} - {response.event.data}")
+    responses = stub.StreamAudio(gen_audio())
+    with sd.OutputStream(samplerate=RATE, channels=CHANNELS, blocksize=CHUNK, dtype='int16') as speaker:
+        for chunk in responses:
+            speaker.write(np.frombuffer(chunk.data, dtype='int16').reshape(-1, CHANNELS))
 
-def send_events(stub):
-    # Example: sending events from another thread
+def event_stream(stub):
+    def gen_events():
+        while True:
+            evt = event_queue.get()
+            yield evt
+
+    responses = stub.StreamEvents(gen_events())
+    for event in responses:
+        print(f"[SERVER EVENT] {event.type}: {event.data}")
+
+def cli_input_thread():
     while True:
-        cmd = input("Event (END_CALL/ABC_EVENT): ")
-        yield voip_pb2.VoIPMessage(event=voip_pb2.Event(type=cmd, data="Some data"))
+        cmd = input("CLIENT CLI EVENT> ")
+        event_queue.put(voip_separate_pb2.Event(type=cmd, data="From client CLI"))
 
 def main():
     channel = grpc.insecure_channel('localhost:50051')
-    stub = voip_pb2_grpc.VoIPServiceStub(channel)
+    audio_stub = voip_separate_pb2_grpc.AudioServiceStub(channel)
+    event_stub = voip_separate_pb2_grpc.EventServiceStub(channel)
 
-    # Start audio streaming in thread
-    threading.Thread(target=stream_audio, args=(stub,), daemon=True).start()
+    threading.Thread(target=record_audio, daemon=True).start()
+    threading.Thread(target=audio_stream, args=(audio_stub,), daemon=True).start()
+    threading.Thread(target=event_stream, args=(event_stub,), daemon=True).start()
+    threading.Thread(target=cli_input_thread, daemon=True).start()
 
-    # Start event sending in main thread
-    for event_msg in send_events(stub):
-        stub.Stream(iter([event_msg]))  # Send event to server
+    # Keep main thread alive
+    while True:
+        pass
 
 if __name__ == "__main__":
     main()

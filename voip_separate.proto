@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package voip;
+
+service AudioService {
+    rpc StreamAudio(stream AudioChunk) returns (stream AudioChunk);
+}
+
+service EventService {
+    rpc StreamEvents(stream Event) returns (stream Event);
+}
+
+message AudioChunk {
+    bytes data = 1;
+    int32 sample_rate = 2;
+    int32 channels = 3;
+}
+
+message Event {
+    string type = 1;   // e.g., END_CALL, ABC_EVENT
+    string data = 2;
+}
